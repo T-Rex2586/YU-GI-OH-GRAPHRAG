@@ -1,0 +1,29 @@
+# Environment & Secrets
+.env
+
+# Python Cache & Virtual Environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Frontend Build & Dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Large Downloaded Datasets & Embedding Checkpoints (Generated via scripts/run_pipeline.py)
+data/raw/
+data/processed/
+data/embeddings_cache/
+
+# Neo4j Docker Volumes
+neo4j_data/
+neo4j_logs/
+neo4j_plugins/
+
+# Jupyter & OS
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+*.log
