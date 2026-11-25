@@ -52,7 +52,6 @@ YU-GI-OH-GRAPHRAG/
 │   ├── rag/                            # Query Router, Hybrid/Vector/Graph Retriever, & Judge
 │   └── evaluation/                     # Benchmark Suite 7 Skenario & Evaluasi RAGAS
 ├── results/                            # Tabel CSV & JSON hasil eksperimen kuantitatif
-├── docs/                               # Laporan Akhir (.docx format Times New Roman BAB 1-5)
 ├── notebooks/
 │   └── yugioh_graphrag_experiment.ipynb # Jupyter Notebook eksperimen & evaluasi bertahap
 └── tests/
