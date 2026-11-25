@@ -147,26 +147,39 @@ class HybridGraphRetriever:
         plan: QueryPlan,
         top_k: int = 6,
         enable_live_ruling_fallback: bool = True,
+        strategy: str = "hybrid",
+        hop_depth: int = 2,
     ) -> RetrievalResult:
-        """Menjalankan pengambilan konteks Hybrid GraphRAG dari Neo4j atau fallback JSON lokal."""
+        """Menjalankan pengambilan konteks dengan strategi 'vector', 'graph', atau 'hybrid'."""
+        strategy = (strategy or "hybrid").lower().strip()
+        use_vector = strategy in ("vector", "hybrid")
+        use_graph = strategy in ("graph", "hybrid")
+
         ok, _ = self.neo4j.check_connection()
         if not ok:
             logger.warning("Neo4j belum aktif — beralih otomatis ke Local Processed Graph Fallback.")
             return self._retrieve_local_fallback(plan, top_k=top_k)
 
-        res = RetrievalResult(mode="Neo4j Hybrid GraphRAG", plan=plan)
+        mode_label = {
+            "vector": "Neo4j Vector-Only RAG",
+            "graph": f"Neo4j Graph-Only ({hop_depth}-Hop Cypher)",
+            "hybrid": f"Neo4j Hybrid GraphRAG (Vector + {hop_depth}-Hop Graph)",
+        }.get(strategy, "Neo4j Hybrid GraphRAG")
+
+        res = RetrievalResult(mode=mode_label, plan=plan)
         lucene_q = sanitize_lucene_query(
             " ".join([plan.english_search_query] + plan.card_names + plan.archetypes)
         )
 
-        # Hitung vektor query (jika API key tersedia)
+        # Hitung vektor query (hanya bila strategi menggunakan vektor)
         query_vec: list[float] | None = None
-        embedder = self._get_embedder()
-        if embedder is not None:
-            try:
-                query_vec = embedder.embed_query(plan.english_search_query)
-            except Exception as exc:
-                logger.warning(f"Gagal menghitung query embedding, lanjutkan dengan Fulltext + Cypher: {exc}")
+        if use_vector:
+            embedder = self._get_embedder()
+            if embedder is not None:
+                try:
+                    query_vec = embedder.embed_query(plan.english_search_query)
+                except Exception as exc:
+                    logger.warning(f"Gagal menghitung query embedding: {exc}")
 
         cards_by_id: dict[int, dict[str, Any]] = {}
         psct_by_id: dict[str, dict[str, Any]] = {}
@@ -174,9 +187,9 @@ class HybridGraphRetriever:
         rb_by_id: dict[str, dict[str, Any]] = {}
 
         # ---------------------------------------------------------------------
-        # 1. Exact / Partial Card & Archetype Lookup di Neo4j
+        # 1. Exact / Partial Card Lookup & Fulltext (untuk mode Graph / Hybrid)
         # ---------------------------------------------------------------------
-        if plan.card_names:
+        if use_graph and plan.card_names:
             res.cypher_traces.append("Cypher Exact/Fuzzy Card Match pada (:Card)")
             rows = self.neo4j.run_query(
                 """
@@ -196,8 +209,7 @@ class HybridGraphRetriever:
                 cnode.pop("embedding", None)
                 cards_by_id[int(cnode["id"])] = cnode
 
-        # Fulltext + Vector Search pada (:Card)
-        if len(cards_by_id) < top_k:
+        if use_graph and len(cards_by_id) < top_k:
             res.cypher_traces.append("Fulltext BM25 Index `card_fulltext`")
             ft_cards = self.neo4j.run_query(
                 """
@@ -212,7 +224,7 @@ class HybridGraphRetriever:
                 cnode.pop("embedding", None)
                 cards_by_id.setdefault(int(cnode["id"]), cnode)
 
-        if query_vec is not None:
+        if use_vector and query_vec is not None:
             try:
                 res.cypher_traces.append("Vector Cosine Index `card_vector_idx`")
                 vec_cards = self.neo4j.run_query(
@@ -231,32 +243,26 @@ class HybridGraphRetriever:
                 logger.debug(f"Vector card query info: {exc}")
 
         # ---------------------------------------------------------------------
-        # 2. Multi-Hop Knowledge Graph Expansion dari Kartu yang Ditemukan!
-        #    (:Card)-[:HAS_PSCT_PATTERN]->(:PSCTRule)
-        #    (:Card)<-[:RULES_ON]-(:Ruling) & (:Card)-[:HAS_FAQ]->(:CardFAQ)
-        #    (:Card)-[:USES_MECHANIC]->(:GameConcept)<-[:EXPLAINS_CONCEPT]-(:RuleChunk)
-        #    (:Card)-[:MENTIONS_CARD]->(:Card)
+        # 2. Multi-Hop Knowledge Graph Expansion (hanya aktif pada Graph & Hybrid!)
         # ---------------------------------------------------------------------
         seed_card_ids = list(cards_by_id.keys())[:8]
-        if seed_card_ids:
+        if use_graph and seed_card_ids:
             res.cypher_traces.append(
-                "Multi-Hop Graph Traversal: (:Card)-[:HAS_PSCT_PATTERN|RULES_ON|HAS_FAQ|USES_MECHANIC|BANNED_IN]-(...)"
+                f"Graph Traversal ({hop_depth}-Hop): (:Card)-[:HAS_PSCT_PATTERN|RULES_ON|BANNED_IN|MENTIONS_CARD]-(...)"
             )
             hop_rows = self.neo4j.run_query(
                 """
                 MATCH (c:Card) WHERE c.id IN $cids
                 OPTIONAL MATCH (c)-[:HAS_PSCT_PATTERN]->(p:PSCTRule)
                 OPTIONAL MATCH (c)<-[:RULES_ON]-(ru:Ruling)
-                OPTIONAL MATCH (c)-[:HAS_FAQ]->(fq:CardFAQ)
                 OPTIONAL MATCH (c)-[b:BANNED_IN]->(fmt:Format)
                 OPTIONAL MATCH (c)-[:MENTIONS_CARD]-(mc:Card)
                 RETURN c.name AS card_name,
                        c.konami_id AS konami_id,
                        collect(DISTINCT p)[0..6] AS pscts,
                        collect(DISTINCT ru)[0..6] AS rulings,
-                       collect(DISTINCT fq)[0..3] AS faqs,
                        collect(DISTINCT {format: fmt.name, status: b.status, max_copies: b.max_copies}) AS bans,
-                       collect(DISTINCT mc.name)[0..5] AS mentioned_cards
+                       collect(DISTINCT mc)[0..5] AS mentioned_cards
                 """,
                 {"cids": seed_card_ids},
             )
@@ -268,12 +274,6 @@ class HybridGraphRetriever:
                         pd.pop("embedding", None)
                         psct_by_id[pd["id"]] = pd
                         res.graph_paths.append(f"({cname}) -[:HAS_PSCT_PATTERN]-> ({pd['name']})")
-                for fq in row.get("faqs") or []:
-                    if fq:
-                        fqd = dict(fq)
-                        fqd.pop("embedding", None)
-                        rulings_by_id[fqd["id"]] = fqd
-                        res.graph_paths.append(f"({cname}) -[:HAS_FAQ]-> (Official Card FAQ #{fqd.get('konami_id')})")
                 for ru in row.get("rulings") or []:
                     if ru:
                         rud = dict(ru)
@@ -285,16 +285,19 @@ class HybridGraphRetriever:
                         res.graph_paths.append(
                             f"({cname}) -[:BANNED_IN {{status: '{b['status']}', max: {b['max_copies']}}}]-> ({b['format']})"
                         )
-                for mname in row.get("mentioned_cards") or []:
-                    if mname:
-                        res.graph_paths.append(f"({cname}) -[:MENTIONS_CARD]- ({mname})")
+                for mc in row.get("mentioned_cards") or []:
+                    if mc:
+                        mcd = dict(mc)
+                        mcd.pop("embedding", None)
+                        res.graph_paths.append(f"({cname}) -[:MENTIONS_CARD]- ({mcd.get('name', '')})")
+                        if hop_depth >= 2 and "id" in mcd:
+                            cards_by_id.setdefault(int(mcd["id"]), mcd)
 
-                # Live Ruling Fallback jika user bertanya ruling kartu yang belum terambil Q&A-nya
                 if (
                     enable_live_ruling_fallback
                     and "ruling_psct" in plan.intents
                     and row.get("konami_id")
-                    and not (row.get("rulings") or row.get("faqs"))
+                    and not row.get("rulings")
                 ):
                     live = fetch_single_card_rulings_live(
                         int(row["konami_id"]),
@@ -308,28 +311,29 @@ class HybridGraphRetriever:
                         rulings_by_id[lqa["id"]] = lqa
                         res.graph_paths.append(f"({lqa['id']}) -[:LIVE_RULING_ON]-> ({cname})")
 
-            # Hop ke Rulebook melalui GameConcept!
-            concept_rb = self.neo4j.run_query(
-                """
-                MATCH (c:Card)-[:USES_MECHANIC]->(g:GameConcept)<-[:EXPLAINS_CONCEPT]-(rc:RuleChunk)
-                WHERE c.id IN $cids
-                RETURN DISTINCT g.name AS concept, rc
-                LIMIT 5
-                """,
-                {"cids": seed_card_ids[:4]},
-            )
-            for r in concept_rb:
-                rcd = dict(r["rc"])
-                rcd.pop("embedding", None)
-                rb_by_id[rcd["id"]] = rcd
-                res.graph_paths.append(
-                    f"(:Card) -[:USES_MECHANIC]-> ({r['concept']}) <-[:EXPLAINS_CONCEPT]- ({rcd['section_title']})"
+            # Hop ke-2: (:Card)-[:USES_MECHANIC]->(:GameConcept)<-[:EXPLAINS_CONCEPT]-(:RuleChunk)
+            if hop_depth >= 2:
+                concept_rb = self.neo4j.run_query(
+                    """
+                    MATCH (c:Card)-[:USES_MECHANIC]->(g:GameConcept)<-[:EXPLAINS_CONCEPT]-(rc:RuleChunk)
+                    WHERE c.id IN $cids
+                    RETURN DISTINCT g.name AS concept, rc
+                    LIMIT 5
+                    """,
+                    {"cids": seed_card_ids[:4]},
                 )
+                for r in concept_rb:
+                    rcd = dict(r["rc"])
+                    rcd.pop("embedding", None)
+                    rb_by_id[rcd["id"]] = rcd
+                    res.graph_paths.append(
+                        f"(:Card) -[:USES_MECHANIC]-> ({r['concept']}) <-[:EXPLAINS_CONCEPT]- ({rcd['section_title']})"
+                    )
 
         # ---------------------------------------------------------------------
-        # 3. Kueri Khusus Dokumen 4: Banlist (berdasarkan Archetype / Format / Status)
+        # 3. Kueri Khusus Dokumen 4: Banlist Graph Traversal
         # ---------------------------------------------------------------------
-        if "banlist" in plan.intents or plan.archetypes or plan.ban_status_filter:
+        if use_graph and ("banlist" in plan.intents or plan.archetypes or plan.ban_status_filter):
             res.cypher_traces.append("Cypher Traversal (:Card)-[:BANNED_IN]->(:Format)")
             ban_cypher = """
             MATCH (c:Card)-[b:BANNED_IN]->(f:Format)
@@ -352,19 +356,18 @@ class HybridGraphRetriever:
             )
 
         # ---------------------------------------------------------------------
-        # 4. Pencarian Semantik & Fulltext untuk Dokumen 1 (Rulebook) & Dokumen 3 (PSCT + Ruling)
+        # 4. Pencarian Vektor & Fulltext untuk Rulebook, PSCT, dan Rulings
         # ---------------------------------------------------------------------
-        if query_vec is not None:
+        if use_vector and query_vec is not None:
             for idx_name, target_dict in (
                 ("rulebook_vector_idx", rb_by_id),
                 ("psct_vector_idx", psct_by_id),
                 ("ruling_vector_idx", rulings_by_id),
-                ("faq_vector_idx", rulings_by_id),
             ):
                 try:
                     vrows = self.neo4j.run_query(
                         f"CALL db.index.vector.queryNodes('{idx_name}', $k, $vec) YIELD node, score RETURN node, score",
-                        {"k": 4, "vec": query_vec},
+                        {"k": top_k, "vec": query_vec},
                     )
                     for r in vrows:
                         nd = dict(r["node"])
@@ -373,38 +376,37 @@ class HybridGraphRetriever:
                 except Exception:
                     pass
 
-        # Fulltext fallback untuk Rulebook, PSCT, dan Rulings
-        for ft_idx, target_dict in (
-            ("rulebook_fulltext", rb_by_id),
-            ("psct_fulltext", psct_by_id),
-            ("ruling_fulltext", rulings_by_id),
-        ):
-            try:
-                frows = self.neo4j.run_query(
-                    f"CALL db.index.fulltext.queryNodes('{ft_idx}', $q, {{limit: 4}}) YIELD node, score RETURN node",
-                    {"q": lucene_q},
+        if use_graph:
+            for ft_idx, target_dict in (
+                ("rulebook_fulltext", rb_by_id),
+                ("psct_fulltext", psct_by_id),
+                ("ruling_fulltext", rulings_by_id),
+            ):
+                try:
+                    frows = self.neo4j.run_query(
+                        f"CALL db.index.fulltext.queryNodes('{ft_idx}', $q, {{limit: 4}}) YIELD node, score RETURN node",
+                        {"q": lucene_q},
+                    )
+                    for r in frows:
+                        nd = dict(r["node"])
+                        nd.pop("embedding", None)
+                        target_dict.setdefault(nd["id"], nd)
+                except Exception:
+                    pass
+
+            if hop_depth >= 2 and any(
+                kw in plan.english_search_query.lower()
+                for kw in ("extra deck", "extra monster zone", "main monster zone", "master rule", "link arrow", "synchro", "xyz", "fusion", "pendulum")
+            ):
+                mr_rows = self.neo4j.run_query(
+                    "MATCH (rc:RuleChunk {id: 'rule_mr2020_extra_deck_zones'}) RETURN rc"
                 )
-                for r in frows:
-                    nd = dict(r["node"])
+                for r in mr_rows:
+                    nd = dict(r["rc"])
                     nd.pop("embedding", None)
-                    target_dict.setdefault(nd["id"], nd)
-            except Exception:
-                pass
+                    rb_by_id[nd["id"]] = nd
 
-        # Pastikan Master Rule 2020/2021 disertakan bila pertanyaan menyangkut Extra Deck / Summon Zone
-        if any(
-            kw in plan.english_search_query.lower()
-            for kw in ("extra monster zone", "main monster zone", "master rule", "link arrow", "synchro", "xyz", "fusion", "pendulum")
-        ):
-            mr_rows = self.neo4j.run_query(
-                "MATCH (rc:RuleChunk {id: 'rule_mr2020_extra_deck_zones'}) RETURN rc"
-            )
-            for r in mr_rows:
-                nd = dict(r["rc"])
-                nd.pop("embedding", None)
-                rb_by_id[nd["id"]] = nd
-
-        res.cards = list(cards_by_id.values())[:10]
+        res.cards = list(cards_by_id.values())[:max(top_k, 8)]
         res.psct_rules = list(psct_by_id.values())[:8]
         res.rulings = list(rulings_by_id.values())[:10]
         res.rulebook_chunks = list(rb_by_id.values())[:6]

@@ -1,0 +1,341 @@
+{
+  "generated_at": "2026-11-26 01:16:08",
+  "total_benchmark_duration_sec": 247.14,
+  "graph_statistics": {
+    "Card": 14704,
+    "Archetype": 756,
+    "RuleChunk": 83,
+    "RuleSection": 10,
+    "PSCTRule": 17,
+    "Ruling": 300,
+    "CardFAQ": 0,
+    "Format": 3,
+    "BanStatus": 4,
+    "GameConcept": 28,
+    "Relationships": 151125,
+    "EmbeddedNodes": 15104
+  },
+  "exp1_vector_vs_graph_vs_hybrid": [
+    {
+      "strategy": "Vector-Only RAG",
+      "recall_at_3": 0.2344,
+      "recall_at_5": 0.4219,
+      "recall_at_10": 0.6198,
+      "mrr": 0.4298,
+      "avg_latency_ms": 234.5
+    },
+    {
+      "strategy": "Graph-Only (Cypher)",
+      "recall_at_3": 0.3073,
+      "recall_at_5": 0.4583,
+      "recall_at_10": 0.4583,
+      "mrr": 0.642,
+      "avg_latency_ms": 114.07
+    },
+    {
+      "strategy": "Hybrid GraphRAG (Graph + Vector)",
+      "recall_at_3": 0.3073,
+      "recall_at_5": 0.4583,
+      "recall_at_10": 0.4896,
+      "mrr": 0.6453,
+      "avg_latency_ms": 153.54
+    }
+  ],
+  "exp2_single_vs_multihop": [
+    {
+      "configuration": "Vector-Only (0-Hop)",
+      "query_complexity": "single-hop",
+      "num_queries": 8,
+      "context_completeness": 0.375,
+      "answer_accuracy": 0.5583,
+      "avg_retrieval_ms": 38.95
+    },
+    {
+      "configuration": "Vector-Only (0-Hop)",
+      "query_complexity": "multi-hop",
+      "num_queries": 8,
+      "context_completeness": 0.5729,
+      "answer_accuracy": 0.6813,
+      "avg_retrieval_ms": 46.62
+    },
+    {
+      "configuration": "Single-Hop GraphRAG (1-Hop)",
+      "query_complexity": "single-hop",
+      "num_queries": 8,
+      "context_completeness": 0.375,
+      "answer_accuracy": 0.575,
+      "avg_retrieval_ms": 113.13
+    },
+    {
+      "configuration": "Single-Hop GraphRAG (1-Hop)",
+      "query_complexity": "multi-hop",
+      "num_queries": 8,
+      "context_completeness": 0.6667,
+      "answer_accuracy": 0.75,
+      "avg_retrieval_ms": 134.42
+    },
+    {
+      "configuration": "Multi-Hop GraphRAG (2-Hop)",
+      "query_complexity": "single-hop",
+      "num_queries": 8,
+      "context_completeness": 0.375,
+      "answer_accuracy": 0.575,
+      "avg_retrieval_ms": 119.83
+    },
+    {
+      "configuration": "Multi-Hop GraphRAG (2-Hop)",
+      "query_complexity": "multi-hop",
+      "num_queries": 8,
+      "context_completeness": 0.6042,
+      "answer_accuracy": 0.7125,
+      "avg_retrieval_ms": 140.39
+    }
+  ],
+  "exp3_graph_traversal_latency": [
+    {
+      "traversal_depth": "1-Hop Traversal",
+      "iterations": 20,
+      "avg_nodes_reached": 31.6,
+      "mean_latency_ms": 1.16,
+      "p50_latency_ms": 1.16,
+      "p95_latency_ms": 1.47,
+      "min_latency_ms": 0.84,
+      "max_latency_ms": 1.61
+    },
+    {
+      "traversal_depth": "2-Hop Traversal",
+      "iterations": 20,
+      "avg_nodes_reached": 9980.7,
+      "mean_latency_ms": 11.95,
+      "p50_latency_ms": 9.19,
+      "p95_latency_ms": 19.8,
+      "min_latency_ms": 2.67,
+      "max_latency_ms": 78.63
+    },
+    {
+      "traversal_depth": "3-Hop Traversal",
+      "iterations": 20,
+      "avg_nodes_reached": 12903.7,
+      "mean_latency_ms": 13.66,
+      "p50_latency_ms": 15.3,
+      "p95_latency_ms": 18.24,
+      "min_latency_ms": 5.59,
+      "max_latency_ms": 22.47
+    }
+  ],
+  "exp4_e2e_integration_latency": [
+    {
+      "pipeline_mode": "Vector-Only (Embed + Neo4j HNSW Vector)",
+      "query_embedding_ms": 5.29,
+      "neo4j_vector_search_ms": 12.93,
+      "neo4j_graph_traversal_ms": 0.0,
+      "end_to_end_retrieval_ms": 18.22
+    },
+    {
+      "pipeline_mode": "Graph-Only (Lexical + Multi-Hop Cypher)",
+      "query_embedding_ms": 0.0,
+      "neo4j_vector_search_ms": 0.0,
+      "neo4j_graph_traversal_ms": 26.83,
+      "end_to_end_retrieval_ms": 26.83
+    },
+    {
+      "pipeline_mode": "Hybrid GraphRAG (Embed + Vector + Multi-Hop Graph)",
+      "query_embedding_ms": 5.29,
+      "neo4j_vector_search_ms": 12.93,
+      "neo4j_graph_traversal_ms": 24.43,
+      "end_to_end_retrieval_ms": 42.65
+    }
+  ],
+  "exp5_node_edge_growth": [
+    {
+      "dataset_scale": "25%",
+      "card_nodes": 3676,
+      "total_nodes": 4867,
+      "total_edges": 37078,
+      "avg_query_latency_ms": 29.01,
+      "neo4j_storage_mb": 45.49,
+      "vector_cache_mb": 30.57
+    },
+    {
+      "dataset_scale": "50%",
+      "card_nodes": 7352,
+      "total_nodes": 8543,
+      "total_edges": 75594,
+      "avg_query_latency_ms": 22.62,
+      "neo4j_storage_mb": 69.71,
+      "vector_cache_mb": 61.15
+    },
+    {
+      "dataset_scale": "75%",
+      "card_nodes": 11028,
+      "total_nodes": 12219,
+      "total_edges": 114714,
+      "avg_query_latency_ms": 21.01,
+      "neo4j_storage_mb": 93.93,
+      "vector_cache_mb": 91.72
+    },
+    {
+      "dataset_scale": "100%",
+      "card_nodes": 14704,
+      "total_nodes": 15895,
+      "total_edges": 154033,
+      "avg_query_latency_ms": 25.28,
+      "neo4j_storage_mb": 118.15,
+      "vector_cache_mb": 122.29
+    }
+  ],
+  "exp6_entity_relationship_extraction": {
+    "summary": [
+      {
+        "extractor_module": "PSCT & Card Graph Relation Extractor (analyze_card_psct)",
+        "precision": 1.0,
+        "recall": 0.963,
+        "f1_score": 0.9811,
+        "tp": 52,
+        "fp": 0,
+        "fn": 2
+      },
+      {
+        "extractor_module": "Query Entity & Format Extractor (QueryRouter)",
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "tp": 13,
+        "fp": 0,
+        "fn": 0
+      }
+    ],
+    "per_card": [
+      {
+        "card_name": "Ash Blossom & Joyous Spring",
+        "true_positives": 12,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0
+      },
+      {
+        "card_name": "Mirrorjade the Iceblade Dragon",
+        "true_positives": 14,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.9333,
+        "f1_score": 0.9655
+      },
+      {
+        "card_name": "Infinite Impermanence",
+        "true_positives": 6,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0
+      },
+      {
+        "card_name": "Called by the Grave",
+        "true_positives": 8,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0
+      },
+      {
+        "card_name": "Black Luster Soldier - Envoy of the Beginning",
+        "true_positives": 5,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.8333,
+        "f1_score": 0.9091
+      },
+      {
+        "card_name": "Solemn Judgment",
+        "true_positives": 7,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0
+      }
+    ]
+  },
+  "exp7_ragas_evaluation": {
+    "aggregate": {
+      "faithfulness": 0.8333,
+      "response_relevancy": 0.7545,
+      "context_recall": 0.8333,
+      "num_samples": 6
+    },
+    "samples": [
+      {
+        "id": "R1",
+        "domain": "Rulebook & Master Rule",
+        "question": "Bagaimana aturan Summon Fusion, Synchro, Xyz, Pendulum, dan Link Monster dari Extra Deck ke Main Monster Zone di Master Rule terbaru?",
+        "faithfulness": 0.0,
+        "response_relevancy": 0.7836,
+        "context_recall": 0.0,
+        "total_claims": 2,
+        "supported_claims": 0,
+        "answer_preview": "Berdasarkan **Master Rule Update terbaru (2020/2021 Rules Update)** dan aturan resmi Yu-Gi-Oh!, berikut adalah ketentuan lengkap mengenai cara melakukan *Special Summon* monster dari **Extra Deck** (Fusion, Synchro, Xyz, Pendulum, dan Link Monster) ke **Main M..."
+      },
+      {
+        "id": "R2",
+        "domain": "Damage Step & PSCT",
+        "question": "Apakah Ash Blossom & Joyous Spring bisa diaktifkan saat Damage Step?",
+        "faithfulness": 1.0,
+        "response_relevancy": 0.9146,
+        "context_recall": 1.0,
+        "total_claims": 1,
+        "supported_claims": 1,
+        "answer_preview": "Halo! Sebagai *Official Head Judge & GraphRAG Assistant*, berikut adalah putusan resmi mengenai apakah **Ash Blossom & Joyous Spring** dapat diaktifkan pada saat *Damage Step*.  ### **Putusan / Jawaban:** **TIDAK BISA.** Efek *Ash Blossom & Joyous Spring* **ti..."
+      },
+      {
+        "id": "R3",
+        "domain": "PSCT Non-Targeting & Card Relation",
+        "question": "Mengapa efek Mirrorjade the Iceblade Dragon bisa mem-banish monster yang memiliki efek tidak bisa ditarget (cannot be targeted)?",
+        "faithfulness": 1.0,
+        "response_relevancy": 0.719,
+        "context_recall": 1.0,
+        "total_claims": 4,
+        "supported_claims": 4,
+        "answer_preview": "Berikut adalah keputusan dan penjelasan resmi selaku **Yu-Gi-Oh! Official Head Judge**:  ---  ### **PUTUSAN RESMI (HEAD JUDGE RULING)**  Efek **Mirrorjade the Iceblade Dragon** **DAPAT** mem-banish monster yang memiliki efek tidak bisa ditarget (*cannot be tar..."
+      },
+      {
+        "id": "R4",
+        "domain": "Banlist TCG vs OCG",
+        "question": "Apa perbedaan status banlist Maxx \"C\" dan Pot of Greed di format TCG dibanding OCG?",
+        "faithfulness": 1.0,
+        "response_relevancy": 0.8079,
+        "context_recall": 1.0,
+        "total_claims": 6,
+        "supported_claims": 6,
+        "answer_preview": "Halo! Sebagai Yu-Gi-Oh! Official Head Judge & GraphRAG Assistant, saya akan menjelaskan perbedaan status banlist antara **Maxx \"C\"** dan **Pot of Greed** di format TCG (Trading Card Game) dan OCG (Official Card Game) berdasarkan data resmi yang tersedia.  Beri..."
+      },
+      {
+        "id": "R5",
+        "domain": "PSCT Conjunctions",
+        "question": "Apa perbedaan konjungsi 'and if you do' pada Called by the Grave dengan konjungsi 'then' pada Infinite Impermanence?",
+        "faithfulness": 1.0,
+        "response_relevancy": 0.5545,
+        "context_recall": 1.0,
+        "total_claims": 6,
+        "supported_claims": 6,
+        "answer_preview": "Halo! Sebagai **Yu-Gi-Oh! Official Head Judge & GraphRAG Assistant**, saya akan menjelaskan perbedaan mendasar antara konjungsi **'and if you do'** (yang digunakan pada *Called by the Grave*) dan **'then'** (yang digunakan pada *Infinite Impermanence*) berdasa..."
+      },
+      {
+        "id": "R6",
+        "domain": "Chain & Spell Speed",
+        "question": "Apakah Quick-Play Spell seperti Called by the Grave dapat di-chain untuk merespons Counter Trap seperti Solemn Judgment?",
+        "faithfulness": 1.0,
+        "response_relevancy": 0.7474,
+        "context_recall": 1.0,
+        "total_claims": 4,
+        "supported_claims": 4,
+        "answer_preview": "Halo! Sebagai Yu-Gi-Oh! Official Head Judge & GraphRAG Assistant, berikut adalah jawaban dan putusan resmi untuk pertanyaan Anda.  ### **Putusan / Jawaban:** **TIDAK BISA.** Kartu *Quick-Play Spell* (seperti *Called by the Grave*) **tidak dapat** di-*chain* un..."
+      }
+    ]
+  }
+}

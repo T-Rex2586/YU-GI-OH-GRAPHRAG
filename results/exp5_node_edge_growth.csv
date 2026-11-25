@@ -1,0 +1,5 @@
+dataset_scale,card_nodes,total_nodes,total_edges,avg_query_latency_ms,neo4j_storage_mb,vector_cache_mb
+25%,3676,4867,37078,29.01,45.49,30.57
+50%,7352,8543,75594,22.62,69.71,61.15
+75%,11028,12219,114714,21.01,93.93,91.72
+100%,14704,15895,154033,25.28,118.15,122.29

@@ -25,7 +25,7 @@ class Settings:
 
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     gemini_llm_model: str = field(
-        default_factory=lambda: os.getenv("GEMINI_LLM_MODEL", "gemini-2.5-flash")
+        default_factory=lambda: os.getenv("GEMINI_LLM_MODEL", "gemini-3.5-flash-lite")
     )
     embedding_provider: str = field(
         default_factory=lambda: os.getenv("EMBEDDING_PROVIDER", "fastembed")

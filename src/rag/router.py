@@ -133,28 +133,42 @@ class QueryRouter:
             '- "formats": subset of ["TCG", "OCG", "Goat"] if specified\n'
             '- "ban_status_filter": one of "Forbidden", "Limited", "Semi-Limited", or null'
         )
-        try:
-            resp = self._client.models.generate_content(
-                model=self.settings.gemini_llm_model,
-                contents=query,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.0,
-                    response_mime_type="application/json",
-                ),
+        candidate_models = list(
+            dict.fromkeys(
+                [
+                    self.settings.gemini_llm_model,
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.5-flash",
+                    "gemini-3.8-flash",
+                ]
             )
-            data: dict[str, Any] = json.loads(resp.text or "{}")
-            merged_cards = list(dict.fromkeys((data.get("card_names") or []) + base_plan.card_names))
-            merged_intents = list(dict.fromkeys((data.get("intents") or []) + base_plan.intents))
-            return QueryPlan(
-                original_query=query,
-                english_search_query=data.get("english_search_query") or query,
-                intents=merged_intents or ["card_info"],
-                card_names=merged_cards,
-                archetypes=data.get("archetypes") or [],
-                formats=data.get("formats") or base_plan.formats,
-                ban_status_filter=data.get("ban_status_filter") or base_plan.ban_status_filter,
-            )
-        except Exception as exc:
-            logger.warning(f"LLM Router fallback ke heuristik: {exc}")
-            return base_plan
+        )
+        for model_name in candidate_models:
+            try:
+                resp = self._client.models.generate_content(
+                    model=model_name,
+                    contents=query,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.0,
+                        response_mime_type="application/json",
+                    ),
+                )
+                data: dict[str, Any] = json.loads(resp.text or "{}")
+                merged_cards = list(dict.fromkeys((data.get("card_names") or []) + base_plan.card_names))
+                merged_intents = list(dict.fromkeys((data.get("intents") or []) + base_plan.intents))
+                return QueryPlan(
+                    original_query=query,
+                    english_search_query=data.get("english_search_query") or query,
+                    intents=merged_intents or ["card_info"],
+                    card_names=merged_cards,
+                    archetypes=data.get("archetypes") or [],
+                    formats=data.get("formats") or base_plan.formats,
+                    ban_status_filter=data.get("ban_status_filter") or base_plan.ban_status_filter,
+                )
+            except Exception as exc:
+                if any(k in str(exc) for k in ("429", "503", "404", "RESOURCE_EXHAUSTED", "UNAVAILABLE")):
+                    continue
+                logger.warning(f"LLM Router fallback ke heuristik: {exc}")
+                return base_plan
+        return base_plan

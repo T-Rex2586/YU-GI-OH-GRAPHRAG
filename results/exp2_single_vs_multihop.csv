@@ -1,0 +1,7 @@
+configuration,query_complexity,num_queries,context_completeness,answer_accuracy,avg_retrieval_ms
+Vector-Only (0-Hop),single-hop,8,0.375,0.5583,38.95
+Vector-Only (0-Hop),multi-hop,8,0.5729,0.6813,46.62
+Single-Hop GraphRAG (1-Hop),single-hop,8,0.375,0.575,113.13
+Single-Hop GraphRAG (1-Hop),multi-hop,8,0.6667,0.75,134.42
+Multi-Hop GraphRAG (2-Hop),single-hop,8,0.375,0.575,119.83
+Multi-Hop GraphRAG (2-Hop),multi-hop,8,0.6042,0.7125,140.39

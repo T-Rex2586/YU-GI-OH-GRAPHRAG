@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scale, Network, Layers, Database, Sparkles } from 'lucide-react';
+import { Scale, Network, Layers, Database, Sparkles, BarChart3 } from 'lucide-react';
 import ChatJudgeView from './components/ChatJudgeView.jsx';
 import GraphExplorerView from './components/GraphExplorerView.jsx';
 import CardCatalogView from './components/CardCatalogView.jsx';
 import DatabaseStatusView from './components/DatabaseStatusView.jsx';
+import BenchmarkView from './components/BenchmarkView.jsx';
 import CardModal from './components/CardModal.jsx';
 
 const TABS = [
   { id: 'judge', label: 'AI Head Judge', icon: Scale },
   { id: 'graph', label: 'Knowledge Graph', icon: Network },
-  { id: 'catalog', label: 'Katalog Kartu & Banlist', icon: Layers },
-  { id: 'status', label: 'Arsitektur & Status', icon: Database },
+  { id: 'catalog', label: 'Katalog & Banlist', icon: Layers },
+  { id: 'benchmark', label: 'Benchmark & RAGAS', icon: BarChart3 },
+  { id: 'status', label: 'Arsitektur', icon: Database },
 ];
 
 export default function App() {
@@ -110,6 +112,7 @@ export default function App() {
                 onInspectInGraph={handleInspectInGraph}
               />
             )}
+            {activeTab === 'benchmark' && <BenchmarkView />}
             {activeTab === 'status' && <DatabaseStatusView health={health} />}
           </motion.div>
         </AnimatePresence>

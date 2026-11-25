@@ -176,6 +176,7 @@ export default function ChatJudgeView({ onSelectCard }) {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [useLlmRouter, setUseLlmRouter] = useState(true);
+  const [strategy, setStrategy] = useState('hybrid');
   const [liveStage, setLiveStage] = useState('');
   const bottomRef = useRef(null);
 
@@ -206,6 +207,8 @@ export default function ChatJudgeView({ onSelectCard }) {
           question: trimmed,
           history: priorHistory,
           use_llm_router: useLlmRouter,
+          strategy,
+          hop_depth: 2,
         }),
       });
 
@@ -309,14 +312,28 @@ export default function ChatJudgeView({ onSelectCard }) {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          {[
+            ['hybrid', 'Hybrid (Graph+Vector)'],
+            ['vector', 'Vector-Only'],
+            ['graph', 'Graph-Only'],
+          ].map(([val, label]) => (
+            <button
+              key={val}
+              className={`chip-btn ${strategy === val ? 'active' : ''}`}
+              onClick={() => setStrategy(val)}
+              disabled={streaming}
+            >
+              {label}
+            </button>
+          ))}
           <button
             className={`chip-btn ${useLlmRouter ? 'active' : ''}`}
             onClick={() => setUseLlmRouter((v) => !v)}
             title="Gunakan LLM Router dwibahasa Indonesia -> Inggris"
           >
             <Cpu size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
-            AI Query Router: {useLlmRouter ? 'ON' : 'OFF'}
+            Router: {useLlmRouter ? 'ON' : 'OFF'}
           </button>
           {messages.length > 0 && (
             <button className="btn" onClick={() => setMessages([])} disabled={streaming}>

@@ -42,12 +42,17 @@ YU-GI-OH-GRAPHRAG/
 │           ├── CardCatalogView.jsx     # Katalog 14.704 kartu & analitik Banlist
 │           └── DatabaseStatusView.jsx  # Statistik live Neo4j & arsitektur skema
 ├── scripts/
-│   └── run_pipeline.py                 # CLI akuisisi data, ingesti Neo4j, & vektorisasi
+│   ├── run_pipeline.py                 # CLI akuisisi data, ingesti Neo4j, & vektorisasi
+│   ├── run_experiments.py              # CLI eksekutor 7 Skenario Eksperimen & RAGAS
+│   └── generate_report_docx.py         # Generator Laporan Akhir Word (.docx Times New Roman)
 ├── src/
 │   ├── config.py                       # Konfigurasi terpusat
 │   ├── ingestion/                      # Akuisisi 4 dokumen & parser tata bahasa PSCT
 │   ├── graph/                          # Driver Neo4j, skema indeks, & batch embedder
-│   └── rag/                            # Query Router, Hybrid Retriever, & Gemini Judge
+│   ├── rag/                            # Query Router, Hybrid/Vector/Graph Retriever, & Judge
+│   └── evaluation/                     # Benchmark Suite 7 Skenario & Evaluasi RAGAS
+├── results/                            # Tabel CSV & JSON hasil eksperimen kuantitatif
+├── docs/                               # Laporan Akhir (.docx format Times New Roman BAB 1-5)
 ├── notebooks/
 │   └── yugioh_graphrag_experiment.ipynb # Jupyter Notebook eksperimen & evaluasi bertahap
 └── tests/

@@ -1,0 +1,4 @@
+strategy,recall_at_3,recall_at_5,recall_at_10,mrr,avg_latency_ms
+Vector-Only RAG,0.2344,0.4219,0.6198,0.4298,234.5
+Graph-Only (Cypher),0.3073,0.4583,0.4583,0.642,114.07
+Hybrid GraphRAG (Graph + Vector),0.3073,0.4583,0.4896,0.6453,153.54

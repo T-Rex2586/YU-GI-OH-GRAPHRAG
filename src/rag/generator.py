@@ -61,23 +61,52 @@ class GraphRAGGenerator:
             "Berikan putusan/jawaban yang akurat, runtut, dan disertai rujukan sumber dari konteks di atas:"
         )
 
+    def _candidate_models(self) -> list[str]:
+        base = self.settings.gemini_llm_model
+        fallbacks = [
+            "gemini-3.5-flash-lite",
+            "gemini-3.5-flash",
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+            "gemma-4-31b-it",
+            "gemini-2.5-flash",
+        ]
+        return list(dict.fromkeys([base] + fallbacks))
+
     def generate(
         self,
         question: str,
         retrieval: RetrievalResult,
         chat_history: list[dict[str, Any]] | None = None,
     ) -> str:
-        """Menghasilkan jawaban lengkap sekaligus (cocok untuk Notebook & evaluasi batch)."""
+        """Menghasilkan jawaban lengkap dengan automatic fallback bila salah satu model 503/sibuk."""
+        import time
+
         prompt = self._build_user_prompt(question, retrieval, chat_history)
-        resp = self.client.models.generate_content(
-            model=self.settings.gemini_llm_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT_JUDGE,
-                temperature=0.15,
-            ),
-        )
-        return resp.text or ""
+        last_err: Exception | None = None
+        for model_name in self._candidate_models():
+            for attempt in range(2):
+                try:
+                    resp = self.client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT_JUDGE,
+                            temperature=0.15,
+                        ),
+                    )
+                    return resp.text or ""
+                except Exception as exc:
+                    last_err = exc
+                    err_s = str(exc)
+                    if any(code in err_s for code in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND")):
+                        if "429" in err_s or "404" in err_s:
+                            break  # langsung pindah ke model fallback berikutnya!
+                        time.sleep(2.0 * (attempt + 1))
+                        continue
+                    raise
+        assert last_err is not None
+        raise last_err
 
     def stream(
         self,
@@ -85,16 +114,28 @@ class GraphRAGGenerator:
         retrieval: RetrievalResult,
         chat_history: list[dict[str, Any]] | None = None,
     ) -> Iterator[str]:
-        """Menghasilkan stream potongan teks token demi token untuk `st.write_stream`."""
+        """Menghasilkan stream potongan teks dengan fallback otomatis jika model utama 503/sibuk."""
         prompt = self._build_user_prompt(question, retrieval, chat_history)
-        response_stream = self.client.models.generate_content_stream(
-            model=self.settings.gemini_llm_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT_JUDGE,
-                temperature=0.15,
-            ),
-        )
-        for chunk in response_stream:
-            if chunk.text:
-                yield chunk.text
+        last_err: Exception | None = None
+        for model_name in self._candidate_models():
+            try:
+                response_stream = self.client.models.generate_content_stream(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT_JUDGE,
+                        temperature=0.15,
+                    ),
+                )
+                for chunk in response_stream:
+                    if chunk.text:
+                        yield chunk.text
+                return
+            except Exception as exc:
+                last_err = exc
+                err_s = str(exc)
+                if any(code in err_s for code in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "404", "NOT_FOUND")):
+                    continue
+                raise
+        if last_err is not None:
+            raise last_err

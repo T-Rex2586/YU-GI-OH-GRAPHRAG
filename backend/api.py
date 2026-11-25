@@ -103,6 +103,8 @@ class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1)
     history: list[ChatMessageIn] = Field(default_factory=list)
     use_llm_router: bool = True
+    strategy: str = "hybrid"
+    hop_depth: int = 2
 
 
 def _sse_pack(event: str, data: Any) -> str:
@@ -174,7 +176,12 @@ def api_chat_stream(req: ChatRequest) -> StreamingResponse:
                     "message": "Menelusuri Neo4j Multi-Hop Knowledge Graph + Vector & BM25 Index...",
                 },
             )
-            retrieval = _RETRIEVER.retrieve(plan, top_k=6)
+            retrieval = _RETRIEVER.retrieve(
+                plan,
+                top_k=6,
+                strategy=req.strategy,
+                hop_depth=req.hop_depth,
+            )
             elapsed_ret = round(time.perf_counter() - t0, 2)
 
             # Perkaya kartu referensi dengan gambar resolusi tinggi & klausa PSCT dari RAM store
@@ -450,6 +457,15 @@ def api_banlist(
         "total": len(filtered),
         "items": filtered,
     }
+
+
+@app.get("/api/benchmarks")
+def api_benchmarks() -> dict[str, Any]:
+    res_file = PROJECT_ROOT / "results" / "experiment_results.json"
+    if not res_file.exists():
+        return {"available": False}
+    data = json.loads(res_file.read_text(encoding="utf-8"))
+    return {"available": True, **data}
 
 
 # Sajikan bundle produksi React otomatis jika `frontend/dist` tersedia

@@ -1,0 +1,4 @@
+pipeline_mode,query_embedding_ms,neo4j_vector_search_ms,neo4j_graph_traversal_ms,end_to_end_retrieval_ms
+Vector-Only (Embed + Neo4j HNSW Vector),5.29,12.93,0.0,18.22
+Graph-Only (Lexical + Multi-Hop Cypher),0.0,0.0,26.83,26.83
+Hybrid GraphRAG (Embed + Vector + Multi-Hop Graph),5.29,12.93,24.43,42.65
